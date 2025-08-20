@@ -1,0 +1,130 @@
+version: "3.8"
+
+#comando para usar
+#command: bundle exec rails db:chatwoot_prepare
+
+services:
+  #serviço principal do front chatwoot
+  chatwoot_app:
+    image: chatwoot/chatwoot:v4.3.0
+    command: bundle exec rails s -p 3000 -b 0.0.0.0
+    entrypoint: docker/entrypoints/rails.sh
+    volumes:
+      - chatwoot_data:/app/storage
+    networks:
+      - network_swarm_public
+    environment:
+      INSTALLATION_NAME: ckhub
+      NODE_ENV: production
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+      SECRET_KEY_BASE: 8B7367F9F6FDC3447847D6D61A7B9
+      FRONTEND_URL: https://chat.ckhub.com.br
+      DEFAULT_LOCALE: pt_BR
+      FORCE_SSL: "true"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      REDIS_URL: redis://redis:6379/1
+      # Servidor de Email Gmail
+      MAILER_SENDER_EMAIL: Chatwoot chat@ckhub.com.br
+      SMTP_DOMAIN: ckhub.com.br
+      SMTP_ADDRESS: mail.ckhub.com.br
+      SMTP_PORT: 587
+      SMTP_USERNAME: chat@ckhub.com.br
+      SMTP_PASSWORD: maTent,18,-
+      SMTP_AUTHENTICATION: login
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      SMTP_OPENSSL_VERIFY_MODE: peer
+      MAILER_INBOUND_EMAIL_DOMAIN: chat@ckhub.com.br
+      # Banco de dados
+      POSTGRES_HOST: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: 476178274A35F347E33B74428EAB1
+      POSTGRES_DATABASE: chatwoot
+      # Armazenamento
+      ACTIVE_STORAGE_SERVICE: local
+      # logs
+      RAILS_LOG_TO_STDOUT: "true"
+      # Avatar Bot
+      USE_INBOX_AVATAR_FOR_BOT: "true"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.chatwoot_app.rule=Host(`chat.ckhub.com.br`)
+        - traefik.http.routers.chatwoot_app.service=chatwoot_app
+        - traefik.http.routers.chatwoot_app.entrypoints=websecure
+        - traefik.http.routers.chatwoot_app.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.chatwoot_app.tls=true
+        - traefik.http.services.chatwoot_app.loadbalancer.server.port=3000
+        # resolver problema de websocket
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.chatwoot_app.middlewares=sslheader
+
+  #worker
+  chatwoot_worker:
+    image: chatwoot/chatwoot:v4.3.0
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    volumes:
+      - chatwoot_data:/app/storage
+    networks:
+      - network_swarm_public
+    environment:
+      INSTALLATION_NAME: ckhub
+      NODE_ENV: production
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+      SECRET_KEY_BASE: 8B7367F9F6FDC3447847D6D61A7B9
+      FRONTEND_URL: https://chat.ckhub.com.br
+      DEFAULT_LOCALE: pt_BR
+      FORCE_SSL: "true"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      REDIS_URL: redis://redis:6379/1
+      # Servidor de Email Gmail
+      MAILER_SENDER_EMAIL: Chatwoot chat@ckhub.com.br
+      SMTP_DOMAIN: ckhub.com.br
+      SMTP_ADDRESS: mail.ckhub.com.br
+      SMTP_PORT: 587
+      SMTP_USERNAME: chat@ckhub.com.br
+      SMTP_PASSWORD: maTent,18,-
+      SMTP_AUTHENTICATION: login
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      SMTP_OPENSSL_VERIFY_MODE: peer
+      MAILER_INBOUND_EMAIL_DOMAIN: chat@ckhub.com.br
+      # Banco de dados
+      POSTGRES_HOST: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: 476178274A35F347E33B74428EAB1
+      POSTGRES_DATABASE: chatwoot
+      # Armazenamento
+      ACTIVE_STORAGE_SERVICE: local
+      # logs
+      RAILS_LOG_TO_STDOUT: "true"
+      # Avatar Bot
+      USE_INBOX_AVATAR_FOR_BOT: "true"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+volumes:
+  chatwoot_data:
+    external: true
+
+networks:
+  network_swarm_public:
+    external: true
+    name: network_swarm_public
